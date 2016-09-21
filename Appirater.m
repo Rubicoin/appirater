@@ -269,32 +269,35 @@ static BOOL _alwaysUseMainBundle = NO;
 }
 
 - (void)showRatingAlert:(BOOL)displayRateLaterButton {
-  UIAlertView *alertView = nil;
-  id <AppiraterDelegate> delegate = _delegate;
-    
-  if(delegate && [delegate respondsToSelector:@selector(appiraterShouldDisplayAlert:)] && ![delegate appiraterShouldDisplayAlert:self]) {
-      return;
-  }
-  
-  if (displayRateLaterButton) {
-  	alertView = [[UIAlertView alloc] initWithTitle:self.alertTitle
-                                           message:self.alertMessage
-                                          delegate:self
-                                 cancelButtonTitle:self.alertCancelTitle
-                                 otherButtonTitles:self.alertRateTitle, self.alertRateLaterTitle, nil];
-  } else {
-  	alertView = [[UIAlertView alloc] initWithTitle:self.alertTitle
-                                           message:self.alertMessage
-                                          delegate:self
-                                 cancelButtonTitle:self.alertCancelTitle
-                                 otherButtonTitles:self.alertRateTitle, nil];
-  }
+    UIAlertController *alertController = nil;
 
-	self.ratingAlert = alertView;
-    [alertView show];
+    id <AppiraterDelegate> delegate = _delegate;
+
+    if(delegate && [delegate respondsToSelector:@selector(appiraterShouldDisplayAlert:)] && ![delegate appiraterShouldDisplayAlert:self]) {
+        return;
+    }
+    alertController = [UIAlertController alertControllerWithTitle:self.alertTitle message:self.alertMessage preferredStyle:UIAlertControllerStyleAlert];
+
+    [alertController addAction:[UIAlertAction actionWithTitle:self.alertRateTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self alertControllerDidDismissWithButtonIndex:1];
+    }]];
+
+    if (displayRateLaterButton) {
+        [alertController addAction:[UIAlertAction actionWithTitle:self.alertRateLaterTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            [self alertControllerDidDismissWithButtonIndex:2];
+        }]];
+    }
+
+    [alertController addAction:[UIAlertAction actionWithTitle:self.alertCancelTitle style:UIAlertActionStyleCancel handler:^(UIAlertAction * _Nonnull action) {
+        [self alertControllerDidDismissWithButtonIndex:0];
+    }]];
+
+
+    self.ratingAlert = alertController;
+    [[[[UIApplication sharedApplication] keyWindow] rootViewController] presentViewController:alertController animated:YES completion:nil];
 
     if (delegate && [delegate respondsToSelector:@selector(appiraterDidDisplayAlert:)]) {
-             [delegate appiraterDidDisplayAlert:self];
+        [delegate appiraterDidDisplayAlert:self];
     }
 }
 
@@ -318,7 +321,7 @@ static BOOL _alwaysUseMainBundle = NO;
 - (BOOL)ratingAlertIsAppropriate {
     return ([self connectedToNetwork]
             && ![self userHasDeclinedToRate]
-            && !self.ratingAlert.visible
+            && !self.ratingAlert.isBeingPresented
             && ![self userHasRatedCurrentVersion]);
 }
 
@@ -521,10 +524,10 @@ static BOOL _alwaysUseMainBundle = NO;
 }
 
 - (void)hideRatingAlert {
-	if (self.ratingAlert.visible) {
+	if (self.ratingAlert.isBeingPresented) {
 		if (_debug)
 			NSLog(@"APPIRATER Hiding Alert");
-		[self.ratingAlert dismissWithClickedButtonIndex:-1 animated:NO];
+        [self.ratingAlert dismissViewControllerAnimated:NO completion:nil];
 	}	
 }
 
@@ -666,7 +669,7 @@ static BOOL _alwaysUseMainBundle = NO;
 	}
 }
 
-- (void)alertView:(UIAlertView *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex {
+- (void)alertControllerDidDismissWithButtonIndex:(NSInteger)buttonIndex {
 	NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
     
     id <AppiraterDelegate> delegate = _delegate;
@@ -712,7 +715,7 @@ static BOOL _alwaysUseMainBundle = NO;
 //Close the in-app rating (StoreKit) view and restore the previous status bar style.
 + (void)closeModal {
 	if (_modalOpen) {
-		[[UIApplication sharedApplication]setStatusBarStyle:_statusBarStyle animated:_usesAnimation];
+		[[UIApplication sharedApplication] setStatusBarStyle:_statusBarStyle animated:_usesAnimation];
 		BOOL usedAnimation = _usesAnimation;
 		[self setModalOpen:NO];
 		
